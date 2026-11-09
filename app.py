@@ -1,22 +1,36 @@
 # app.py
-# Student Performance Prediction System - Streamlit interface
-import json
-import os
+import subprocess
+import sys
+from pathlib import Path
 
-import joblib
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import joblib
 
 st.set_page_config(page_title="Student Predict", page_icon="🎓", layout="wide")
 
+BASE = Path(__file__).parent
+MODEL_PATH = BASE / "student_model.pkl"
+DATA_PATH = BASE / "student_data.csv"
 
-@st.cache_resource
+
+@st.cache_resource(show_spinner="Preparing data and model (first run only)...")
 def load_model():
-    return joblib.load("student_model.pkl")
+    # If the generated files are not in the repo (e.g. on Streamlit Cloud),
+    # run train_model.py once to download the data and train the model.
+    if not (MODEL_PATH.exists() and DATA_PATH.exists()):
+        result = subprocess.run(
+            [sys.executable, "train_model.py"],
+            cwd=BASE, capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            st.error("Could not run train_model.py:\n\n" + result.stderr[-1500:])
+            st.stop()
+    return joblib.load(MODEL_PATH)
 
 
 model = load_model()
-data = pd.read_csv("student_data.csv")
+data = pd.read_csv(DATA_PATH)
 
 st.title("🎓 Student Performance Prediction")
 st.caption("Classroom prototype for academic risk exploration")
@@ -29,17 +43,6 @@ c3.metric("Historical at-risk records", int((data["G3"] < 10).sum()))
 st.subheader("Dataset preview")
 st.dataframe(data.head(10), use_container_width=True)
 
-# Model evaluation summary (written by train_model.py)
-if os.path.exists("evaluation_results.json"):
-    with open("evaluation_results.json") as f:
-        ev = json.load(f)
-    st.subheader("Model evaluation summary (held-out test set)")
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Accuracy", ev["accuracy"])
-    m2.metric("Precision (At risk)", ev["at_risk_precision"])
-    m3.metric("Recall (At risk)", ev["at_risk_recall"])
-    m4.metric("F1-score (At risk)", ev["at_risk_f1"])
-
 st.subheader("Predict uploaded student records")
 st.write("Upload a CSV containing the same predictor columns as the training data.")
 
@@ -48,7 +51,7 @@ st.download_button(
     "Download sample input CSV",
     template.to_csv(index=False),
     "sample_prediction_input.csv",
-    "text/csv",
+    "text/csv"
 )
 
 uploaded = st.file_uploader("Choose student CSV", type=["csv"])
@@ -64,7 +67,8 @@ if uploaded is not None:
         predictions = model.predict(new_data[required_columns])
         results = new_data.copy()
         results["Prediction"] = [
-            "AT RISK" if value == 1 else "NOT AT RISK" for value in predictions
+            "AT RISK" if value == 1 else "NOT AT RISK"
+            for value in predictions
         ]
 
         st.subheader("Prediction results")
@@ -74,10 +78,10 @@ if uploaded is not None:
             "Download prediction results",
             results.to_csv(index=False),
             "student_predictions.csv",
-            "text/csv",
+            "text/csv"
         )
 
-st.caption(
-    "Predictions are not diagnoses and must not be used as the sole basis "
-    "for real student decisions."
+st.info(
+    "Responsible use: predictions are not diagnoses and must not be the "
+    "sole basis for real decisions about students."
 )
