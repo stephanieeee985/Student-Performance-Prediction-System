@@ -1,7 +1,7 @@
 # app.py
-import joblib
-import pandas as pd
 import streamlit as st
+import pandas as pd
+import joblib
 
 st.set_page_config(page_title="Student Predict", page_icon="🎓", layout="wide")
 
@@ -9,14 +9,6 @@ st.set_page_config(page_title="Student Predict", page_icon="🎓", layout="wide"
 @st.cache_resource
 def load_model():
     return joblib.load("student_model.pkl")
-
-
-def show_table(frame):
-    """Full-width dataframe that works on old and new Streamlit versions."""
-    try:
-        st.dataframe(frame, width="stretch")
-    except TypeError:
-        st.dataframe(frame, use_container_width=True)
 
 
 model = load_model()
@@ -31,7 +23,7 @@ c2.metric("Average final grade", round(data["G3"].mean(), 2))
 c3.metric("Historical at-risk records", int((data["G3"] < 10).sum()))
 
 st.subheader("Dataset preview")
-show_table(data.head(10))
+st.dataframe(data.head(10), use_container_width=True)
 
 st.subheader("Predict uploaded student records")
 st.write("Upload a CSV containing the same predictor columns as the training data.")
@@ -41,7 +33,7 @@ st.download_button(
     "Download sample input CSV",
     template.to_csv(index=False),
     "sample_prediction_input.csv",
-    "text/csv",
+    "text/csv"
 )
 
 uploaded = st.file_uploader("Choose student CSV", type=["csv"])
@@ -62,17 +54,17 @@ if uploaded is not None:
         ]
 
         st.subheader("Prediction results")
-        show_table(results)
+        st.dataframe(results, use_container_width=True)
         st.metric("Predicted at-risk records", int((predictions == 1).sum()))
 
         st.download_button(
             "Download prediction results",
             results.to_csv(index=False),
             "student_predictions.csv",
-            "text/csv",
+            "text/csv"
         )
 
-st.caption(
+st.info(
     "Responsible use: predictions are not diagnoses and must not be the sole "
-    "basis for real decisions about students."
+    "basis for real student decisions."
 )
