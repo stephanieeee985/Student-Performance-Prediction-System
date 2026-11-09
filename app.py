@@ -1,7 +1,11 @@
 # app.py
-import streamlit as st
-import pandas as pd
+# Student Performance Prediction System - Streamlit interface
+import json
+import os
+
 import joblib
+import pandas as pd
+import streamlit as st
 
 st.set_page_config(page_title="Student Predict", page_icon="🎓", layout="wide")
 
@@ -25,6 +29,17 @@ c3.metric("Historical at-risk records", int((data["G3"] < 10).sum()))
 st.subheader("Dataset preview")
 st.dataframe(data.head(10), use_container_width=True)
 
+# Model evaluation summary (written by train_model.py)
+if os.path.exists("evaluation_results.json"):
+    with open("evaluation_results.json") as f:
+        ev = json.load(f)
+    st.subheader("Model evaluation summary (held-out test set)")
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Accuracy", ev["accuracy"])
+    m2.metric("Precision (At risk)", ev["at_risk_precision"])
+    m3.metric("Recall (At risk)", ev["at_risk_recall"])
+    m4.metric("F1-score (At risk)", ev["at_risk_f1"])
+
 st.subheader("Predict uploaded student records")
 st.write("Upload a CSV containing the same predictor columns as the training data.")
 
@@ -33,7 +48,7 @@ st.download_button(
     "Download sample input CSV",
     template.to_csv(index=False),
     "sample_prediction_input.csv",
-    "text/csv"
+    "text/csv",
 )
 
 uploaded = st.file_uploader("Choose student CSV", type=["csv"])
@@ -49,22 +64,20 @@ if uploaded is not None:
         predictions = model.predict(new_data[required_columns])
         results = new_data.copy()
         results["Prediction"] = [
-            "AT RISK" if value == 1 else "NOT AT RISK"
-            for value in predictions
+            "AT RISK" if value == 1 else "NOT AT RISK" for value in predictions
         ]
 
         st.subheader("Prediction results")
         st.dataframe(results, use_container_width=True)
         st.metric("Predicted at-risk records", int((predictions == 1).sum()))
-
         st.download_button(
             "Download prediction results",
             results.to_csv(index=False),
             "student_predictions.csv",
-            "text/csv"
+            "text/csv",
         )
 
-st.info(
-    "Responsible use: predictions are not diagnoses and must not be the sole "
-    "basis for real student decisions."
+st.caption(
+    "Predictions are not diagnoses and must not be used as the sole basis "
+    "for real student decisions."
 )
